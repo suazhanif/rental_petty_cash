@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================
+         TRANSACTION FORM (also used as the quick-entry dialog)
+         ============================================================ -->
+    <record id="petty_cash_transaction_form_view" model="ir.ui.view">
+        <field name="name">petty.cash.transaction.form</field>
+        <field name="model">petty.cash.transaction</field>
+        <field name="arch" type="xml">
+            <form string="Petty Cash Transaction">
+                <header>
+                    <button name="action_post" type="object" string="Post"
+                            class="btn-primary" invisible="state != 'draft' or not id"
+                            groups="rental_petty_cash.group_petty_cash_approver"/>
+                    <button name="action_print_voucher" type="object" string="Print Voucher"
+                            icon="fa-print" invisible="state != 'posted'"/>
+                    <button name="action_cancel" type="object" string="Cancel"
+                            invisible="state == 'cancel' or not id"
+                            groups="rental_petty_cash.group_petty_cash_approver"
+                            confirm="Cancel this transaction? Posted entries will be reversed."/>
+                    <button name="action_reset_draft" type="object" string="Reset to Draft"
+                            invisible="state != 'cancel'"
+                            groups="rental_petty_cash.group_petty_cash_approver"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,posted"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_bill" type="object"
+                                class="oe_stat_button" icon="fa-file-text-o"
+                                invisible="not bill_id" string="Vendor Bill"
+                                groups="account.group_account_invoice"/>
+                        <button name="action_open_entry" type="object"
+                                class="oe_stat_button" icon="fa-book"
+                                invisible="not move_id" string="Cash Entry"
+                                groups="account.group_account_invoice"/>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="box_id" options="{'no_create': True}"
+                                   readonly="state != 'draft'"/>
+                            <field name="transaction_type" widget="radio"
+                                   options="{'horizontal': True}" readonly="state != 'draft'"/>
+                            <field name="date" readonly="state != 'draft'"/>
+                            <field name="reference" readonly="state != 'draft'"
+                                   placeholder="Receipt no. / cheque no."/>
+                            <field name="description" readonly="state != 'draft'"
+                                   placeholder="e.g. Plumbing repair in kitchen"/>
+                        </group>
+                        <group invisible="transaction_type != 'expense'" string="Vendor &amp; Unit">
+                            <field name="partner_id" readonly="state != 'draft'"
+                                   required="transaction_type == 'expense'"
+                                   context="{'res_partner_search_mode': 'supplier'}"/>
+                            <field name="vendor_phone" widget="phone" invisible="not partner_id"/>
+                            <field name="vendor_vat" invisible="not partner_id"/>
+                            <field name="property_id" readonly="state != 'draft'"
+                                   options="{'no_create': True}"/>
+                            <field name="tenancy_id" readonly="state != 'draft'"
+                                   options="{'no_create': True}" invisible="not property_id"/>
+                            <field name="project_id" invisible="not project_id"/>
+                        </group>
+                        <group invisible="transaction_type != 'topup'" string="Add Balance">
+                            <field name="topup_amount" widget="monetary"
+                                   readonly="state != 'draft'"
+                                   required="transaction_type == 'topup'"/>
+                            <field name="source_journal_id" readonly="state != 'draft'"
+                                   required="transaction_type == 'topup'"
+                                   options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <notebook invisible="transaction_type != 'expense'">
+                        <page string="Expense Lines" name="lines">
+                            <field name="line_ids" readonly="state != 'draft'">
+                                <list editable="bottom">
+                                    <field name="product_id" optional="show"
+                                           options="{'no_create': True}"/>
+                                    <field name="name"/>
+                                    <field name="account_id" options="{'no_create': True}"/>
+                                    <field name="quantity"/>
+                                    <field name="price_unit"/>
+                                    <field name="tax_ids" widget="many2many_tags"
+                                           options="{'no_create': True}"/>
+                                    <field name="price_subtotal" sum="Before Tax"/>
+                                    <field name="price_tax" sum="Tax" optional="show"/>
+                                    <field name="price_total" sum="Total"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                    <field name="company_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                            <group class="oe_subtotal_footer">
+                                <field name="amount_untaxed"/>
+                                <field name="amount_tax"/>
+                                <field name="amount_total" class="oe_subtotal_footer_separator"/>
+                            </group>
+                        </page>
+                    </notebook>
+                    <group string="Accounting" invisible="state == 'draft'">
+                        <group>
+                            <field name="bill_id" invisible="not bill_id"
+                                   groups="account.group_account_invoice"/>
+                            <field name="move_id" groups="account.group_account_invoice"/>
+                        </group>
+                        <group>
+                            <field name="balance_after" widget="monetary"/>
+                            <field name="user_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="company_id" invisible="1"/>
+                    <field name="journal_id" invisible="1"/>
+                </sheet>
+                <chatter/>
+                <footer>
+                    <button string="Save &amp; Post" name="action_save_post" type="object"
+                            class="btn-primary"
+                            groups="rental_petty_cash.group_petty_cash_approver"/>
+                    <button string="Save as Draft" name="action_save_close" type="object"
+                            class="btn-secondary"/>
+                    <button string="Discard" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- LIST -->
+    <record id="petty_cash_transaction_list_view" model="ir.ui.view">
+        <field name="name">petty.cash.transaction.list</field>
+        <field name="model">petty.cash.transaction</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'cancel'" decoration-info="state == 'draft'">
+                <field name="date"/>
+                <field name="name"/>
+                <field name="box_id" optional="show"/>
+                <field name="transaction_type" widget="badge"
+                       decoration-success="transaction_type == 'topup'"
+                       decoration-warning="transaction_type == 'expense'"/>
+                <field name="description"/>
+                <field name="property_id" optional="show"/>
+                <field name="project_id" optional="hide"/>
+                <field name="partner_id" optional="show"/>
+                <field name="reference" optional="show"/>
+                <field name="amount_untaxed" sum="Before Tax" optional="show"/>
+                <field name="amount_tax" sum="Tax" optional="show"/>
+                <field name="amount_total" sum="Total"/>
+                <field name="balance_after" optional="hide"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'posted'"
+                       decoration-info="state == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- SEARCH -->
+    <record id="petty_cash_transaction_search_view" model="ir.ui.view">
+        <field name="name">petty.cash.transaction.search</field>
+        <field name="model">petty.cash.transaction</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="description"/>
+                <field name="reference"/>
+                <field name="partner_id"/>
+                <field name="property_id"/>
+                <field name="project_id"/>
+                <field name="box_id"/>
+                <filter name="expense" string="Expenses" domain="[('transaction_type', '=', 'expense')]"/>
+                <filter name="topup" string="Top-ups" domain="[('transaction_type', '=', 'topup')]"/>
+                <separator/>
+                <filter name="draft" string="To Post" domain="[('state', '=', 'draft')]"/>
+                <filter name="posted" string="Posted" domain="[('state', '=', 'posted')]"/>
+                <separator/>
+                <filter name="date" string="Date" date="date"/>
+                <group>
+                    <filter name="group_by_box" string="Petty Cash" context="{'group_by': 'box_id'}"/>
+                    <filter name="group_by_type" string="Type" context="{'group_by': 'transaction_type'}"/>
+                    <filter name="group_by_property" string="Unit" context="{'group_by': 'property_id'}"/>
+                    <filter name="group_by_project" string="Building" context="{'group_by': 'project_id'}"/>
+                    <filter name="group_by_vendor" string="Vendor" context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_by_month" string="Month" context="{'group_by': 'date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- PIVOT -->
+    <record id="petty_cash_transaction_pivot_view" model="ir.ui.view">
+        <field name="name">petty.cash.transaction.pivot</field>
+        <field name="model">petty.cash.transaction</field>
+        <field name="arch" type="xml">
+            <pivot string="Petty Cash Analysis" sample="1">
+                <field name="property_id" type="row"/>
+                <field name="date" interval="month" type="col"/>
+                <field name="amount_total" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_petty_cash_transaction" model="ir.actions.act_window">
+        <field name="name">Petty Cash Transactions</field>
+        <field name="res_model">petty.cash.transaction</field>
+        <field name="view_mode">list,form,pivot</field>
+        <field name="search_view_id" ref="petty_cash_transaction_search_view"/>
+    </record>
+
+    <record id="action_petty_cash_by_unit" model="ir.actions.act_window">
+        <field name="name">Expenses by Unit</field>
+        <field name="res_model">petty.cash.transaction</field>
+        <field name="view_mode">pivot,list,form</field>
+        <field name="domain">[('transaction_type', '=', 'expense')]</field>
+        <field name="context">{'search_default_posted': 1}</field>
+        <field name="search_view_id" ref="petty_cash_transaction_search_view"/>
+    </record>
+</odoo>

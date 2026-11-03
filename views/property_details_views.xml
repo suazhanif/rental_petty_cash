@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="property_details_form_view_inherit_petty_cash" model="ir.ui.view">
+        <field name="name">property.details.form.inherit.petty.cash</field>
+        <field name="model">property.details</field>
+        <field name="inherit_id" ref="rental_management.property_details_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_petty_cash" type="object"
+                        class="oe_stat_button" icon="fa-money"
+                        invisible="not petty_cash_count">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_value">
+                            <field name="petty_cash_total" widget="monetary"/>
+                            <field name="petty_cash_currency_id" invisible="1"/>
+                        </span>
+                        <span class="o_stat_text">Petty Cash</span>
+                    </div>
+                </button>
+                <field name="petty_cash_count" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

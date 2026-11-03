@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_petty_cash_root"
+              name="Cash &amp; Bank"
+              parent="account.menu_finance_reports"
+              groups="rental_management.property_rental_manager,rental_management.property_rental_officer,account.group_account_invoice"
+              sequence="76"/>
+
+    <!-- Petty cash -->
+    <menuitem id="menu_petty_cash_box"
+              name="Petty Cash"
+              parent="menu_petty_cash_root"
+              action="action_petty_cash_box"
+              sequence="1"/>
+    <menuitem id="menu_petty_cash_transactions"
+              name="Petty Cash Transactions"
+              parent="menu_petty_cash_root"
+              action="action_petty_cash_transaction"
+              sequence="2"/>
+    <menuitem id="menu_petty_cash_by_unit"
+              name="Petty Cash by Unit"
+              parent="menu_petty_cash_root"
+              action="action_petty_cash_by_unit"
+              sequence="3"/>
+
+    <!-- Bank (accounting users only) -->
+    <menuitem id="menu_rental_bank_import"
+              name="Import Bank Statement"
+              parent="menu_petty_cash_root"
+              action="action_rental_bank_import_wizard"
+              groups="account.group_account_invoice"
+              sequence="10"/>
+    <menuitem id="menu_rental_bank_lines"
+              name="Bank Lines"
+              parent="menu_petty_cash_root"
+              action="action_rental_bank_lines"
+              groups="account.group_account_invoice"
+              sequence="11"/>
+    <menuitem id="menu_rental_bank_by_unit"
+              name="Bank by Unit"
+              parent="menu_petty_cash_root"
+              action="action_rental_bank_by_unit"
+              groups="account.group_account_invoice"
+              sequence="12"/>
+</odoo>

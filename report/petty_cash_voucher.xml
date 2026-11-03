@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_petty_cash_voucher" model="ir.actions.report">
+        <field name="name">Petty Cash Voucher</field>
+        <field name="model">petty.cash.transaction</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">rental_petty_cash.report_petty_cash_voucher</field>
+        <field name="report_file">rental_petty_cash.report_petty_cash_voucher</field>
+        <field name="print_report_name">'Petty Cash Voucher - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_petty_cash_transaction"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_petty_cash_voucher">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family:Arial,sans-serif;font-size:12px;color:#222;">
+                        <div style="text-align:center;background:#714B67;color:#fff;padding:12px;border-radius:6px;margin-bottom:14px;">
+                            <h3 style="margin:0;color:#fff;">
+                                <t t-if="o.transaction_type == 'topup'">Petty Cash Receipt (Top-up)</t>
+                                <t t-else="">Petty Cash Payment Voucher</t>
+                            </h3>
+                            <div><span t-field="o.name"/></div>
+                        </div>
+
+                        <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
+                            <tr>
+                                <td style="width:20%;padding:4px 8px;background:#faf8fa;font-weight:bold;border:1px solid #eee;">Date</td>
+                                <td style="width:30%;padding:4px 8px;border:1px solid #eee;"><span t-field="o.date"/></td>
+                                <td style="width:20%;padding:4px 8px;background:#faf8fa;font-weight:bold;border:1px solid #eee;">Petty Cash</td>
+                                <td style="width:30%;padding:4px 8px;border:1px solid #eee;"><span t-field="o.box_id"/></td>
+                            </tr>
+                            <tr>
+                                <td style="padding:4px 8px;background:#faf8fa;font-weight:bold;border:1px solid #eee;">Receipt / Ref No.</td>
+                                <td style="padding:4px 8px;border:1px solid #eee;"><span t-field="o.reference"/></td>
+                                <td style="padding:4px 8px;background:#faf8fa;font-weight:bold;border:1px solid #eee;">Purpose</td>
+                                <td style="padding:4px 8px;border:1px solid #eee;"><span t-field="o.description"/></td>
+                            </tr>
+                            <t t-if="o.transaction_type == 'expense'">
+                                <tr>
+                                    <td style="padding:4px 8px;background:#faf8fa;font-weight:bold;border:1px solid #eee;">Vendor</td>
+                                    <td style="padding:4px 8px;border:1px solid #eee;">
+                                        <span t-field="o.partner_id"/>
+                                        <div t-if="o.vendor_vat">Tax ID: <span t-field="o.vendor_vat"/></div>
+                                        <div t-if="o.vendor_phone">Phone: <span t-field="o.vendor_phone"/></div>
+                                    </td>
+                                    <td style="padding:4px 8px;background:#faf8fa;font-weight:bold;border:1px solid #eee;">Unit / Contract</td>
+                                    <td style="padding:4px 8px;border:1px solid #eee;">
+                                        <span t-field="o.property_id"/>
+                                        <div t-if="o.project_id"><span t-field="o.project_id"/></div>
+                                        <div t-if="o.tenancy_id"><span t-field="o.tenancy_id.tenancy_seq"/></div>
+                                    </td>
+                                </tr>
+                            </t>
+                            <t t-else="">
+                                <tr>
+                                    <td style="padding:4px 8px;background:#faf8fa;font-weight:bold;border:1px solid #eee;">Received From</td>
+                                    <td colspan="3" style="padding:4px 8px;border:1px solid #eee;"><span t-field="o.source_journal_id"/></td>
+                                </tr>
+                            </t>
+                        </table>
+
+                        <table t-if="o.transaction_type == 'expense'"
+                               style="width:100%;border-collapse:collapse;">
+                            <tr style="background:#714B67;color:#fff;">
+                                <th style="padding:5px;border:1px solid #714B67;">Description</th>
+                                <th style="padding:5px;border:1px solid #714B67;text-align:right;">Qty</th>
+                                <th style="padding:5px;border:1px solid #714B67;text-align:right;">Unit Price</th>
+                                <th style="padding:5px;border:1px solid #714B67;">Taxes</th>
+                                <th style="padding:5px;border:1px solid #714B67;text-align:right;">Before Tax</th>
+                                <th style="padding:5px;border:1px solid #714B67;text-align:right;">Tax</th>
+                                <th style="padding:5px;border:1px solid #714B67;text-align:right;">Total</th>
+                            </tr>
+                            <tr t-foreach="o.line_ids" t-as="l">
+                                <td style="padding:4px;border:1px solid #eee;"><span t-field="l.name"/></td>
+                                <td style="padding:4px;border:1px solid #eee;text-align:right;"><span t-field="l.quantity"/></td>
+                                <td style="padding:4px;border:1px solid #eee;text-align:right;"><span t-field="l.price_unit"/></td>
+                                <td style="padding:4px;border:1px solid #eee;"><span t-esc="', '.join(l.tax_ids.mapped('name'))"/></td>
+                                <td style="padding:4px;border:1px solid #eee;text-align:right;"><span t-field="l.price_subtotal"/></td>
+                                <td style="padding:4px;border:1px solid #eee;text-align:right;"><span t-field="l.price_tax"/></td>
+                                <td style="padding:4px;border:1px solid #eee;text-align:right;"><span t-field="l.price_total"/></td>
+                            </tr>
+                            <tr style="font-weight:bold;">
+                                <td colspan="4" style="padding:4px;border:1px solid #eee;text-align:right;">Totals</td>
+                                <td style="padding:4px;border:1px solid #eee;text-align:right;"><span t-field="o.amount_untaxed"/></td>
+                                <td style="padding:4px;border:1px solid #eee;text-align:right;"><span t-field="o.amount_tax"/></td>
+                                <td style="padding:4px;border:1px solid #eee;text-align:right;color:#714B67;"><span t-field="o.amount_total"/></td>
+                            </tr>
+                        </table>
+                        <div t-else="" style="font-size:16px;padding:10px;border:1px solid #eee;text-align:center;">
+                            Amount added: <strong><span t-field="o.amount_total"/></strong>
+                        </div>
+
+                        <p style="margin-top:10px;">
+                            Petty cash balance after this transaction:
+                            <strong><span t-field="o.balance_after"/></strong>
+                        </p>
+
+                        <table style="width:100%;margin-top:60px;text-align:center;">
+                            <tr>
+                                <td style="width:33%;">_________________________</td>
+                                <td style="width:33%;">_________________________</td>
+                                <td style="width:34%;">_________________________</td>
+                            </tr>
+                            <tr>
+                                <td>Prepared By<br/><span t-field="o.user_id"/></td>
+                                <td>Approved By</td>
+                                <td><t t-if="o.transaction_type == 'expense'">Received By (Vendor)</t><t t-else="">Custodian</t></td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

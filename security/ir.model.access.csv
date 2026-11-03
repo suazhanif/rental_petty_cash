@@ -1,0 +1,11 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_petty_cash_box_officer,petty.cash.box officer,model_petty_cash_box,rental_management.property_rental_officer,1,0,0,0
+access_petty_cash_box_manager,petty.cash.box manager,model_petty_cash_box,rental_management.property_rental_manager,1,1,1,1
+access_petty_cash_box_account,petty.cash.box accountant,model_petty_cash_box,account.group_account_manager,1,1,1,1
+access_petty_cash_txn_officer,petty.cash.transaction officer,model_petty_cash_transaction,rental_management.property_rental_officer,1,1,1,0
+access_petty_cash_txn_manager,petty.cash.transaction manager,model_petty_cash_transaction,rental_management.property_rental_manager,1,1,1,1
+access_petty_cash_txn_account,petty.cash.transaction accountant,model_petty_cash_transaction,account.group_account_invoice,1,1,1,1
+access_petty_cash_line_officer,petty.cash.transaction.line officer,model_petty_cash_transaction_line,rental_management.property_rental_officer,1,1,1,1
+access_petty_cash_line_manager,petty.cash.transaction.line manager,model_petty_cash_transaction_line,rental_management.property_rental_manager,1,1,1,1
+access_petty_cash_line_account,petty.cash.transaction.line accountant,model_petty_cash_transaction_line,account.group_account_invoice,1,1,1,1
+access_rental_bank_import_wizard,rental.bank.import.wizard,model_rental_bank_import_wizard,account.group_account_invoice,1,1,1,1

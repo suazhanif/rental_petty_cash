@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================
+         PETTY CASH BOX FORM: the one screen for everything
+         ============================================================ -->
+    <record id="petty_cash_box_form_view" model="ir.ui.view">
+        <field name="name">petty.cash.box.form</field>
+        <field name="model">petty.cash.box</field>
+        <field name="arch" type="xml">
+            <form string="Petty Cash">
+                <header>
+                    <button name="action_add_balance" type="object" string="Add Balance"
+                            icon="fa-plus-circle" class="btn-primary" invisible="not id"/>
+                    <button name="action_new_expense" type="object" string="New Expense"
+                            icon="fa-shopping-cart" class="btn-primary" invisible="not id"/>
+                    <button name="action_view_ledger" type="object" string="Cash Ledger"
+                            icon="fa-book" invisible="not id"
+                            groups="account.group_account_invoice"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_expenses" type="object"
+                                class="oe_stat_button" icon="fa-shopping-cart">
+                            <div class="o_field_widget o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="total_expense" widget="monetary"/>
+                                </span>
+                                <span class="o_stat_text">Spent</span>
+                            </div>
+                        </button>
+                        <button name="action_view_topups" type="object"
+                                class="oe_stat_button" icon="fa-plus-circle">
+                            <div class="o_field_widget o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="total_topup" widget="monetary"/>
+                                </span>
+                                <span class="o_stat_text">Added</span>
+                            </div>
+                        </button>
+                        <button name="action_view_pending" type="object"
+                                class="oe_stat_button" icon="fa-hourglass-half"
+                                invisible="not draft_count">
+                            <field name="draft_count" string="To Post" widget="statinfo"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <field name="is_low_balance" invisible="1"/>
+                    <div class="alert alert-warning text-center" role="alert"
+                         invisible="not is_low_balance">
+                        <i class="fa fa-exclamation-triangle me-1" title="Low balance"/>
+                        <strong>Low balance.</strong> Use <strong>Add Balance</strong> to top up
+                        this petty cash.
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Head Office Petty Cash"/></h1>
+                    </div>
+                    <div class="d-flex gap-4 my-3" invisible="not id">
+                        <div class="border rounded p-3 flex-fill text-center">
+                            <div class="text-muted">Current Balance</div>
+                            <h2 class="mb-0"><field name="balance" widget="monetary"/></h2>
+                        </div>
+                        <div class="border rounded p-3 flex-fill text-center">
+                            <div class="text-muted">Pending (not posted)</div>
+                            <h2 class="mb-0"><field name="draft_amount" widget="monetary"/></h2>
+                        </div>
+                        <div class="border rounded p-3 flex-fill text-center">
+                            <div class="text-muted">Float / Limit</div>
+                            <h2 class="mb-0"><field name="float_amount" widget="monetary"/></h2>
+                        </div>
+                    </div>
+                    <notebook>
+                        <page string="Transactions" name="transactions">
+                            <field name="transaction_ids" readonly="1"
+                                   context="{'default_box_id': id}">
+                                <list decoration-muted="state == 'cancel'"
+                                      decoration-info="state == 'draft'"
+                                      default_order="date desc, id desc" limit="40">
+                                    <field name="date"/>
+                                    <field name="name"/>
+                                    <field name="transaction_type" widget="badge"
+                                           decoration-success="transaction_type == 'topup'"
+                                           decoration-warning="transaction_type == 'expense'"/>
+                                    <field name="description"/>
+                                    <field name="property_id"/>
+                                    <field name="partner_id"/>
+                                    <field name="reference" optional="show"/>
+                                    <field name="amount_untaxed" optional="show"/>
+                                    <field name="amount_tax" optional="show"/>
+                                    <field name="amount_total"/>
+                                    <field name="balance_after" optional="show"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                    <field name="state" widget="badge"
+                                           decoration-success="state == 'posted'"
+                                           decoration-info="state == 'draft'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Settings" name="settings">
+                            <group>
+                                <group>
+                                    <field name="journal_id" options="{'no_create': True}"/>
+                                    <field name="cash_account_id"/>
+                                    <field name="custodian_id"/>
+                                    <field name="company_id" groups="base.group_multi_company"/>
+                                    <field name="active" invisible="1"/>
+                                </group>
+                                <group>
+                                    <field name="float_amount"/>
+                                    <field name="low_balance_alert"/>
+                                    <field name="default_vendor_id"/>
+                                    <field name="default_expense_account_id"
+                                           options="{'no_create': True}"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                    <field name="currency_id" invisible="1"/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- DASHBOARD KANBAN -->
+    <record id="petty_cash_box_kanban_view" model="ir.ui.view">
+        <field name="name">petty.cash.box.kanban</field>
+        <field name="model">petty.cash.box</field>
+        <field name="arch" type="xml">
+            <kanban create="1">
+                <field name="currency_id"/>
+                <field name="is_low_balance"/>
+                <field name="draft_count"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <field name="name" class="fw-bold fs-4"/>
+                            <span t-if="record.is_low_balance.raw_value"
+                                  class="badge text-bg-warning">Low balance</span>
+                        </div>
+                        <field name="custodian_id" class="text-muted"/>
+                        <div class="my-2">
+                            <div class="text-muted small">Current Balance</div>
+                            <field name="balance" widget="monetary" class="fs-3 fw-bold"/>
+                        </div>
+                        <div class="d-flex gap-3 small text-muted">
+                            <span>Spent: <field name="total_expense" widget="monetary"/></span>
+                            <span>Added: <field name="total_topup" widget="monetary"/></span>
+                            <span t-if="record.draft_count.raw_value">
+                                To post: <field name="draft_count"/>
+                            </span>
+                        </div>
+                        <footer class="mt-3 d-flex gap-2">
+                            <button name="action_add_balance" type="object"
+                                    class="btn btn-sm btn-primary">Add Balance</button>
+                            <button name="action_new_expense" type="object"
+                                    class="btn btn-sm btn-primary">New Expense</button>
+                            <button name="action_view_expenses" type="object"
+                                    class="btn btn-sm btn-secondary">Transactions</button>
+                        </footer>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="petty_cash_box_list_view" model="ir.ui.view">
+        <field name="name">petty.cash.box.list</field>
+        <field name="model">petty.cash.box</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="journal_id"/>
+                <field name="custodian_id"/>
+                <field name="balance" widget="monetary"/>
+                <field name="total_expense" widget="monetary" optional="show"/>
+                <field name="total_topup" widget="monetary" optional="show"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_petty_cash_box" model="ir.actions.act_window">
+        <field name="name">Petty Cash</field>
+        <field name="res_model">petty.cash.box</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create your first petty cash box</p>
+            <p>Link it to your Petty Cash journal (type Cash). From the box you can
+               add balance, record expenses per unit and see every transaction.</p>
+        </field>
+    </record>
+</odoo>

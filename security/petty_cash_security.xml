@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_petty_cash_approver" model="res.groups">
+        <field name="name">Petty Cash Approver</field>
+        <field name="comment">Can post and cancel petty cash top-ups and expenses (creates the accounting entries).</field>
+        <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+    </record>
+
+    <record id="petty_cash_box_company_rule" model="ir.rule">
+        <field name="name">Petty Cash Box: multi-company</field>
+        <field name="model_id" ref="model_petty_cash_box"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="petty_cash_transaction_company_rule" model="ir.rule">
+        <field name="name">Petty Cash Transaction: multi-company</field>
+        <field name="model_id" ref="model_petty_cash_transaction"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+</odoo>
