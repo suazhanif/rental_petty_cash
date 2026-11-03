@@ -22,7 +22,7 @@ Petty Cash for Rental Management
     "author": "Baramej® Business and Digital Technology Center LLC",
     "website": "https://baramej.io/en",
     "category": "Realestate",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "license": "OPL-1",
     "depends": ["rental_management", "account"],
     "data": [

@@ -102,6 +102,7 @@
                                 <group>
                                     <field name="journal_id" options="{'no_create': True}"/>
                                     <field name="cash_account_id"/>
+                                    <field name="transfer_account_id" options="{'no_create': True}"/>
                                     <field name="custodian_id"/>
                                     <field name="company_id" groups="base.group_multi_company"/>
                                     <field name="active" invisible="1"/>

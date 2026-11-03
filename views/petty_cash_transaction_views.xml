@@ -101,6 +101,8 @@
                             <field name="bill_id" invisible="not bill_id"
                                    groups="account.group_account_invoice"/>
                             <field name="move_id" groups="account.group_account_invoice"/>
+                            <field name="source_move_id" invisible="not source_move_id"
+                                   groups="account.group_account_invoice"/>
                         </group>
                         <group>
                             <field name="balance_after" widget="monetary"/>

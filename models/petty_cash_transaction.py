@@ -3,16 +3,22 @@
 # Part of Baramej®. See LICENSE file for full copyright and licensing details.
 """Petty cash top-ups and expenses.
 
-Accounting created on Post:
+Accounting created on Post. Every movement of the petty cash account is a
+cash register transaction (account.bank.statement.line), so it is counted in
+the journal's "Balance" on the Accounting dashboard and not in "Misc.":
 
-* Top-up  : journal entry in the petty cash journal
-            Dr Petty Cash account / Cr source (bank) journal account
+* Top-up  : two statement lines through the Liquidity Transfer account
+            (same pattern as petty_cash_management):
+              source bank journal : Dr Transfer   / Cr Bank
+              petty cash journal  : Dr Petty Cash / Cr Transfer
+            the two Transfer lines are reconciled together.
 * Expense : vendor bill with the expense lines and taxes (keeps vendor and
-            VAT reporting correct), then a journal entry in the petty cash
-            journal  Dr Vendor payable / Cr Petty Cash account, reconciled
+            VAT reporting correct), then an outgoing statement line in the
+            petty cash journal  Dr Vendor payable / Cr Petty Cash, reconciled
             with the bill so the bill shows as Paid.
 
-Cancel reverses the entries (no deletion), so it also works on locked journals.
+Cancel adds opposite statement lines (or reverses plain entries posted by
+older versions) instead of deleting, so it also works on locked journals.
 """
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
@@ -90,6 +96,10 @@ class PettyCashTransaction(models.Model):
     bill_id = fields.Many2one("account.move", string="Vendor Bill", readonly=True, copy=False)
     move_id = fields.Many2one(
         "account.move", string="Petty Cash Entry", readonly=True, copy=False
+    )
+    source_move_id = fields.Many2one(
+        "account.move", string="Bank Entry", readonly=True, copy=False,
+        help="Bank / cash side of a top-up.",
     )
     balance_after = fields.Monetary(
         string="Balance After", readonly=True, copy=False,
@@ -173,37 +183,82 @@ class PettyCashTransaction(models.Model):
             rec.write({"state": "posted", "balance_after": rec.box_id.balance})
         return True
 
+    # ------------------------------------------------------------------
+    # Statement line helpers
+    # ------------------------------------------------------------------
+    def _create_statement_line(self, journal, amount, label, counterpart_account,
+                               partner=False, date=False):
+        """Create a cash/bank register transaction and point its counterpart
+        (suspense) line to ``counterpart_account``.
+
+        A statement line is what the journal dashboard counts as "Balance";
+        a plain journal entry on the cash account is counted as "Misc.".
+        Returns the statement line's journal entry.
+        """
+        self.ensure_one()
+        st_line = self.env["account.bank.statement.line"].sudo().create({
+            "journal_id": journal.id,
+            "date": date or self.date,
+            "payment_ref": label,
+            "amount": amount,
+            "partner_id": partner.id if partner else False,
+        })
+        move = st_line.move_id
+        counterpart = move.line_ids.filtered(
+            lambda l: l.account_id != journal.default_account_id
+        )
+        counterpart.with_context(skip_account_move_synchronization=True).write({
+            "account_id": counterpart_account.id,
+            "partner_id": partner.id if partner else False,
+        })
+        move.with_context(skip_account_move_synchronization=True).write({
+            "ref": label,
+            "petty_cash_transaction_id": self.id,
+        })
+        return move
+
+    def _counterpart_lines(self, move):
+        """Lines of a statement-line entry that are not on the cash/bank account"""
+        liquidity = move.journal_id.default_account_id
+        return move.line_ids.filtered(lambda l: l.account_id != liquidity)
+
+    def _get_transfer_account(self):
+        account = self.box_id.transfer_account_id or self.company_id.transfer_account_id
+        if not account:
+            raise UserError(_(
+                "Set a Liquidity Transfer Account on petty cash %s (Settings tab).",
+                self.box_id.name,
+            ))
+        if not account.reconcile:
+            raise UserError(_(
+                "The Liquidity Transfer Account %s must allow reconciliation.",
+                account.display_name,
+            ))
+        return account
+
+    # ------------------------------------------------------------------
+    # Posting
+    # ------------------------------------------------------------------
     def _post_topup(self):
         self.ensure_one()
         if self.currency_id.compare_amounts(self.topup_amount, 0.0) <= 0:
             raise UserError(_("Enter the amount to add."))
         if not self.source_journal_id.default_account_id:
             raise UserError(_("Choose the bank or cash journal the money comes from."))
+        transfer = self._get_transfer_account()
         label = _("Petty cash top-up %(name)s%(ref)s", name=self.name,
                   ref=f" - {self.reference}" if self.reference else "")
-        move = self.env["account.move"].sudo().create({
-            "move_type": "entry",
-            "journal_id": self.journal_id.id,
-            "date": self.date,
-            "ref": label,
-            "petty_cash_transaction_id": self.id,
-            "line_ids": [
-                fields.Command.create({
-                    "name": label,
-                    "account_id": self.box_id.cash_account_id.id,
-                    "debit": self.topup_amount,
-                    "credit": 0.0,
-                }),
-                fields.Command.create({
-                    "name": label,
-                    "account_id": self.source_journal_id.default_account_id.id,
-                    "debit": 0.0,
-                    "credit": self.topup_amount,
-                }),
-            ],
-        })
-        move.action_post()
-        self.move_id = move
+
+        # Money leaves the bank:   Dr Transfer / Cr Bank
+        move_out = self._create_statement_line(
+            self.source_journal_id, -self.topup_amount, label, transfer
+        )
+        # Money arrives in petty cash:   Dr Petty Cash / Cr Transfer
+        move_in = self._create_statement_line(
+            self.journal_id, self.topup_amount, label, transfer
+        )
+        (self._counterpart_lines(move_out) | self._counterpart_lines(move_in)).reconcile()
+        self.write({"move_id": move_in.id, "source_move_id": move_out.id})
 
     def _post_expense(self):
         self.ensure_one()
@@ -225,8 +280,7 @@ class PettyCashTransaction(models.Model):
                 amt=self.currency_id.format(self.amount_total),
             ))
 
-        Move = self.env["account.move"].sudo()
-        bill = Move.create({
+        bill = self.env["account.move"].sudo().create({
             "move_type": "in_invoice",
             "partner_id": self.partner_id.id,
             "invoice_date": self.date,
@@ -245,36 +299,16 @@ class PettyCashTransaction(models.Model):
         )
         label = _("Petty cash payment %(name)s - %(vendor)s",
                   name=self.name, vendor=self.partner_id.display_name)
-        pay_lines = [
-            fields.Command.create({
-                "name": label,
-                "account_id": pl.account_id.id,
-                "partner_id": pl.partner_id.id,
-                "debit": -pl.balance if pl.balance < 0 else 0.0,
-                "credit": pl.balance if pl.balance > 0 else 0.0,
-                "date_maturity": self.date,
-            })
-            for pl in payable
-        ]
-        pay_lines.append(fields.Command.create({
-            "name": label,
-            "account_id": self.box_id.cash_account_id.id,
-            "partner_id": self.partner_id.id,
-            "debit": 0.0,
-            "credit": -sum(payable.mapped("balance")),
-        }))
-        payment = Move.create({
-            "move_type": "entry",
-            "journal_id": self.journal_id.id,
-            "date": self.date,
-            "ref": label,
-            "petty_cash_transaction_id": self.id,
-            "line_ids": pay_lines,
-        })
-        payment.action_post()
-        (payable | payment.line_ids.filtered(
-            lambda l: l.account_id.account_type == "liability_payable"
-        )).reconcile()
+        # Cash goes out:   Dr Vendor payable / Cr Petty Cash
+        # (payable balance on the bill is negative, i.e. the amount paid out)
+        payment = self._create_statement_line(
+            self.journal_id,
+            sum(payable.mapped("balance")),
+            label,
+            payable[:1].account_id,
+            partner=bill.commercial_partner_id,
+        )
+        (payable | self._counterpart_lines(payment)).reconcile()
         self.write({"bill_id": bill.id, "move_id": payment.id})
 
     def _expense_narration(self):
@@ -294,25 +328,51 @@ class PettyCashTransaction(models.Model):
     def action_cancel(self):
         for rec in self:
             if rec.state == "posted":
-                moves = (rec.bill_id | rec.move_id).filtered(lambda m: m.state == "posted")
-                moves.line_ids.remove_move_reconcile()
-                if moves:
-                    moves._reverse_moves(
-                        default_values_list=[
-                            {"date": fields.Date.context_today(rec),
-                             "ref": _("Cancel %(name)s: %(ref)s", name=rec.name, ref=m.ref or m.name)}
-                            for m in moves
-                        ],
-                        cancel=True,
-                    )
+                rec._cancel_accounting()
             rec.state = "cancel"
         return True
+
+    def _cancel_accounting(self):
+        self.ensure_one()
+        today = fields.Date.context_today(self)
+        posted = (self.bill_id | self.move_id | self.source_move_id).filtered(
+            lambda m: m.state == "posted"
+        )
+        posted.line_ids.remove_move_reconcile()
+
+        # Cash/bank register transactions: add the opposite transaction so the
+        # correction also stays in the journal's Balance.
+        for move in posted.filtered("statement_line_id"):
+            st_line = move.statement_line_id
+            label = _("Cancel %(name)s: %(ref)s", name=self.name, ref=move.ref or move.name)
+            counterpart = self._counterpart_lines(move)
+            reverse = self._create_statement_line(
+                st_line.journal_id, -st_line.amount, label,
+                counterpart[:1].account_id, partner=counterpart[:1].partner_id,
+                date=today,
+            )
+            (counterpart | self._counterpart_lines(reverse)).reconcile()
+
+        # Vendor bill and entries posted by older versions: standard reversal.
+        others = posted.filtered(lambda m: not m.statement_line_id)
+        if others:
+            others._reverse_moves(
+                default_values_list=[
+                    {"date": today,
+                     "ref": _("Cancel %(name)s: %(ref)s", name=self.name, ref=m.ref or m.name)}
+                    for m in others
+                ],
+                cancel=True,
+            )
 
     def action_reset_draft(self):
         for rec in self:
             if rec.state != "cancel":
                 continue
-            rec.write({"state": "draft", "bill_id": False, "move_id": False, "balance_after": 0.0})
+            rec.write({
+                "state": "draft", "bill_id": False, "move_id": False,
+                "source_move_id": False, "balance_after": 0.0,
+            })
         return True
 
     def _open_move(self, move):

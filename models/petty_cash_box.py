@@ -62,6 +62,18 @@ class PettyCashBox(models.Model):
         help="Generic vendor for small receipts (e.g. 'Petty Cash Vendor').",
     )
 
+    transfer_account_id = fields.Many2one(
+        "account.account",
+        string="Liquidity Transfer Account",
+        tracking=True,
+        default=lambda self: self.env.company.transfer_account_id,
+        domain="[('reconcile', '=', True), ('account_type', 'in', ('asset_current', 'liability_current'))]",
+        help="Intermediate account used for top-ups: the bank leg and the petty cash "
+        "leg both go through this account and are reconciled together, so each side "
+        "shows in its journal's Balance (cash register) instead of Misc. "
+        "Must allow reconciliation.",
+    )
+
     transaction_ids = fields.One2many("petty.cash.transaction", "box_id")
     balance = fields.Monetary(compute="_compute_balance", string="Current Balance")
     is_low_balance = fields.Boolean(compute="_compute_balance")
